@@ -1,0 +1,17 @@
+[Unit]
+Wants=multi-user.target
+After=multi-user.target
+
+[Service]
+ExecStart=/usr/local/bin/motionplus -n -c /etc/motionplus/motion.conf
+User=motion
+Group=motion
+Restart=on-failure
+RestartSec=10s
+ExecStartPre=/bin/mkdir -p /tmp/motion
+ExecStartPre=/bin/chmod 0777 /tmp/motion
+#ExecStartPre=/bin/mkdir -p /tmp/motion_run
+#ExecStartPre=/bin/chmod 0777 /tmp/motion_run
+
+[Install]
+WantedBy=multi-user.target
