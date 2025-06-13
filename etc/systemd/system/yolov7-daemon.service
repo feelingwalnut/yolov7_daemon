@@ -1,0 +1,22 @@
+[Unit]
+Description=YOLOv7 Detection Daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/yolov7_daemon.py
+Restart=always
+RestartSec=2
+User=motion
+Group=motion
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory=/home/motion/yolov7
+Environment=PYTHONPATH=/home/motion/yolov7
+Environment=MPLCONFIGDIR=/tmp/matplotlib-config
+#Environment=PYTHONUNBUFFERED=1
+MemoryMax=1G
+MemorySwapMax=10M
+#LimitNPROC=4
+
+[Install]
+WantedBy=multi-user.target
