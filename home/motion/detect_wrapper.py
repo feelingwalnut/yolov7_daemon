@@ -6,14 +6,23 @@ import shutil
 from pathlib import Path
 import sys
 import subprocess
+from configparser import ConfigParser
 
-# CONFIGURATION
-debug_no_delete = False  # Set to True to skip all deletions
+# --- Load configuration ---
+config = ConfigParser()
+config.read("/home/motion/yolov7/yolov7_daemon.conf")
 
-output_dir = Path("/home/motion/files")
-confidence_threshold = 0.60
-daemon_socket = "/tmp/yolov7.sock"
-event_base_dir = Path("/tmp/motion")
+# Daemon settings
+output_dir = Path(config.get("daemon", "output_dir"))
+event_base_dir = Path(config.get("daemon", "event_base_dir"))
+confidence_threshold = config.getfloat("daemon", "confidence_threshold")
+daemon_socket = config.get("daemon", "socket_path")
+
+# Wrapper settings
+debug_no_delete = config.getboolean("wrapper", "debug_no_delete", fallback=False)
+pushover_token = config.get("wrapper", "pushover_token")
+pushover_user = config.get("wrapper", "pushover_user")
+pushover_message = config.get("wrapper", "pushover_message")
 
 # --- Find .webp image in the given directory ---
 def find_webp_in_directory(directory):
@@ -27,7 +36,6 @@ if len(sys.argv) < 2:
     print("[ERROR] No event directory name provided.")
     sys.exit(1)
 
-# Construct full path from Motion's input
 event_name = sys.argv[1]
 image_dir = event_base_dir / event_name
 
@@ -49,8 +57,7 @@ print("[INFO] Sending detection request to YOLOv7 daemon...")
 request = {
     "directory": str(image_dir),
     "meta": {
-        "source": "motion",
-        "confidence_threshold": confidence_threshold
+        "source": "motion"
     }
 }
 
@@ -84,7 +91,6 @@ for det in detections:
 
 if not valid_detection_found:
     print("[INFO] No valid detections above threshold found.")
-
     if debug_no_delete:
         print(f"[DEBUG] Skipping deletion due to debug_no_delete=True: {image_dir}")
     else:
@@ -94,7 +100,6 @@ if not valid_detection_found:
             print("  → Folder deleted successfully.")
         except Exception as e:
             print(f"  × Failed to delete folder: {e}")
-
     sys.exit(0)
 
 # Try to find the annotated image
@@ -111,7 +116,7 @@ else:
     print("[WARN] No annotated image found. Will use original for fallback.")
     annotated_image = image_path
 
-# Clean up .txt detection files before moving the folder
+# Clean up .txt detection files
 for file in image_dir.glob("*.txt"):
     try:
         file.unlink()
@@ -119,9 +124,8 @@ for file in image_dir.glob("*.txt"):
     except Exception as e:
         print(f"[WARN] Failed to delete txt file: {file} → {e}")
 
-# Move processing directory to output location
+# Move folder
 destination = output_dir / image_dir.name
-
 print(f"[INFO] Detection found. Moving directory: {image_dir} → {destination}")
 try:
     shutil.move(str(image_dir), destination)
@@ -130,7 +134,7 @@ except Exception as e:
     print(f"  × Failed to move directory: {e}")
     sys.exit(1)
 
-# Recursively set permissions to 777
+# Set permissions
 print(f"[INFO] Setting permissions to 777 for: {destination}")
 try:
     for root, dirs, files in os.walk(destination):
@@ -143,14 +147,14 @@ try:
 except Exception as e:
     print(f"  × Failed to change permissions: {e}")
 
-# Send notification with annotated image (if available)
+# Send Pushover notification
 try:
     push_image_path = destination / annotated_image.name
     curl_cmd = [
         "curl", "-s",
-        "--form-string", "token=APIKEY",
-        "--form-string", "user=LOGININFORMATION",
-        "--form-string", "message=Motion!",
+        "--form-string", f"token={pushover_token}",
+        "--form-string", f"user={pushover_user}",
+        "--form-string", f"message={pushover_message}",
         "--form", f"attachment=@{push_image_path}",
         "https://api.pushover.net/1/messages.json"
     ]
