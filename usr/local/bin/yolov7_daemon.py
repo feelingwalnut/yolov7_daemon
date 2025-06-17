@@ -254,11 +254,12 @@ if __name__ == "__main__":
         queue_maxsize = config.getint("daemon", "queue_maxsize", fallback=100)
         imgsz = config.getint("daemon", "imgsz", fallback=640)
 
-        SOCKET_PATH = "/tmp/yolov7.sock"
+        SOCKET_PATH = config.get("daemon", "socket_path", fallback="/tmp/yolov7.sock")
         if os.path.exists(SOCKET_PATH):
             os.remove(SOCKET_PATH)
 
-        device = select_device('')
+        device_str = config.get("daemon", "device", fallback="")
+        device = select_device(device_str)
         model = attempt_load(weights_path, map_location=device)
         model.eval()
         stride = int(model.stride.max())
